@@ -37,13 +37,13 @@ is_deep_interp = False
 
 chnk = int(1e4) # Number of frames to process at a time
 
-# Cascade filenames here
+# Cascade filenames here ~~~~~~~~~~~~~~~~~~~~~~
 
 folder_list = get_target_folders_v2(save_location, data_type,file_num, 'TSeries')
 target_folder = folder_list[0]
 os.chdir(target_folder)
 
-# ROI file handling
+## ROI file handling
 try:
     roi_list = roifile.roiread('RoiSet.zip')
 except FileNotFoundError:
@@ -57,8 +57,7 @@ for i in range(num_cells):
         located_dend_roi = True
         break
 
-# .h5 processed calcium movie handling
-## don't use max bytes, use is_deep_interp instead
+## Grabbing .h5 processed calcium movie handling - 
 try:
     if is_deep_interp:
         h = h5py.File('inference_results.h5', 'r')
@@ -67,30 +66,34 @@ try:
 except FileNotFoundError:
     print(f'Processed file not found. \n Check destination or "is_deep_interp" flag.')
 
-datName = [key for key in h.keys()][0]
-totalFrames, sizeX, sizeY = h[datName].shape
+dat_name = [key for key in h.keys()][0]
+totalFrames, sizeX, sizeY = h[dat_name].shape
 
-roi_list = roifile.roiread("RoiSet.zip")
-numCells = len(roi_list)
 
+## Grabbing cell masks -
 x = np.linspace(0, sizeX-1, sizeX)
 y = np.linspace(0, sizeY-1, sizeY)
 x, y = np.meshgrid(x, y)
-mask2d = np.zeros((numCells, sizeX, sizeY))
-for cc in tqdm(range(numCells), desc="getting masks", ncols=75):
+mask2d = np.zeros((num_cells, sizeX, sizeY))
+
+for cc in tqdm(range(num_cells), desc="getting masks", ncols=75):
     nmCoord = roi_list[cc].coordinates()
     mask2d[cc,:,:] = in_polygon(x, y, nmCoord[:,0], nmCoord[:,1])
-raw_cell_traces = np.zeros((totalFrames, numCells))
-dff = np.zeros((totalFrames, numCells))
+
+## Using cell masks to extract raw cell traces -
+raw_cell_traces = np.zeros((totalFrames, num_cells))
+dff = np.zeros((totalFrames, num_cells))
+
 for f_i in tqdm(range(math.ceil(totalFrames / chnk)), desc="Extracting...", ncols=75):
     start = int(f_i * chnk)
     stop = min(int((f_i + 1) * chnk), totalFrames)
-    imgstack = h[datName][start:stop, :, :]
-    for cc in range(numCells):
+    imgstack = h[dat_name][start:stop, :, :]
+
+    for cc in range(num_cells):
         nz = np.nonzero(mask2d[cc,:,:])
         raw_cell_traces[start:stop, cc] = np.mean(imgstack[:,nz[0], nz[1]], axis=1)
 
 print("Calculating dff for all cells")
-for cc in range(numCells):
+for cc in range(num_cells):
     dff[:,cc] = filter_baseline_dF_comp(raw_cell_traces[:,cc], 99*4+1)
 print("done")

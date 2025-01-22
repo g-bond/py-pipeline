@@ -38,8 +38,9 @@ def filter_baseline_dF_comp(raw, pts = 99):
     
     return raw_new
 
-def get_target_folders_v2(loc, date, fnames, filetype):
-    
+## Need
+#def get_target_folders_v2(loc, date, fnames, filetype):
+
 
 def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, frame_offset=False, offset=30):
     '''
