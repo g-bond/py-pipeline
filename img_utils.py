@@ -8,6 +8,39 @@ import h5py
 import tifffile
 import numpy as np
 
+from matplotlib import path
+
+def in_polygon(xq, yq, xv, yv):
+    shape = xq.shape
+    xq = xq.reshape(-1)
+    yq = yq.reshape(-1)
+    xv = xv.reshape(-1)
+    yv = yv.reshape(-1)
+    q = [(xq[i], yq[i]) for i in range(xq.shape[0])]
+    p = path.Path([(xv[i], yv[i]) for i in range(xv.shape[0])])
+    return p.contains_points(q).reshape(shape)
+
+
+def filter_baseline_dF_comp(raw, pts = 99):
+    F_temp = raw
+    F_temp = np.concatenate((np.repeat(np.mean(F_temp[2:5]),pts),F_temp))
+    F_temp = np.concatenate((F_temp, np.repeat(np.mean(F_temp[-4:-1]),pts)))
+    # 25th percentile medfilt
+    F_temp = signal.medfilt(F_temp, pts)
+    # remove padding
+    raw_new = F_temp[pts:-pts]
+    #code.interact(local=dict(globals(), **locals()))
+    raw_new = np.divide((raw - raw_new), raw_new)
+    
+    raw_newlpf = signal.medfilt(raw_new, 91)
+    
+    raw_new = raw_new - raw_newlpf
+    
+    return raw_new
+
+def get_target_folders_v2(loc, date, fnames, filetype):
+    
+
 def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, frame_offset=False, offset=30):
     '''
     Convert .tif stacks from BRUKER/SCANIMAGE to monolithic .h5 files.

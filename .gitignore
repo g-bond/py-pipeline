@@ -2,3 +2,6 @@
 #   as part of this repo
 deepinterpolation-0.2.0
 2019_09_11_23_32_unet_single_1024_mean_absolute_error_Ai93-0450.h5
+
+# Other Python materials not required
+__pycache__
