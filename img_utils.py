@@ -12,6 +12,41 @@ import numpy as np
 from matplotlib import path
 from scipy import signal
 from statistics import median
+from skimage.draw import polygon2mask
+
+def gen_polyline_roi(nm_coord, d_width=10.0, size_x=512, size_y=512):
+    '''
+    Create a mask for dendrite ROI
+    Parameters:
+        nm_coord (np.array): 2D NumPy array listing x and y coordinates indicating member pixels.
+        d_width (float): Width to draw mask for
+        size_x (int): Size of mask to use in first dimension.
+        size_y (int): Size of mask to use in second dimension.
+    Returns:
+        polyline_mask (np.array): 2D NumPy array encoding mask for polyline
+    '''
+    x = nm_coord[:,1] # These are reversed from MATLAB
+    y = nm_coord[:,0]
+
+    r = np.sqrt( (x[1:] - x[0:-1])**2 + (y[1:] - y[0:-1])**2 )
+
+    delta_x = np.multiply((d_width / 2) / r, (y[:-1] - y[1:]))
+    delta_y = np.multiply((d_width / 2) / r, (x[1:] - x[:-1]))
+
+    new_x = x + np.append(delta_x, delta_x[-1])
+    new_y = y + np.append(delta_y, delta_y[-1])
+
+    delta_x = np.multiply((-d_width / 2) / r, (y[:-1] - y[1:]))
+    delta_y = np.multiply((-d_width / 2) / r, (x[1:] - x[:-1]))
+
+    new_x = np.append(new_x, np.flip(x + (np.append(delta_x, delta_x[-1]))))
+    new_y = np.append(new_y, np.flip(y + (np.append(delta_y, delta_y[-1]))))
+
+    new_x = np.append(new_x, new_x[0])
+    new_y = np.append(new_y, new_y[0])
+
+    polyline_mask = polygon2mask((size_x, size_y), np.array([new_x, new_y]).T)
+    return polyline_mask.T
 
 def in_polygon(xq, yq, xv, yv):
     shape = xq.shape

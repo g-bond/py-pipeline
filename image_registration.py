@@ -186,7 +186,7 @@ def stacks_to_hdf5(parent_dir, delete_tiffs):
         last_30  = np.zeros((30, img_width, img_height))
         last_30_fnames = fnames[-30:]
         for i in range(30):
-            first_30[i,:,:] = tifffile.imread(fnames[i], is_ome=False))
+            first_30[i,:,:] = tifffile.imread(fnames[i], is_ome=False)
             last_30[i,:,:]  = tifffile.imread(last_30_fnames, is_ome=False)
         num_frames = len(fnames) + 60
         

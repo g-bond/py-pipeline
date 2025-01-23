@@ -2,6 +2,7 @@
 # processing script for extracting traces from calcium movies
 # presupposes registration, denoising optional
 import os
+import sys
 import code
 from glob import glob
 
@@ -14,18 +15,18 @@ import numpy as np
 
 from tqdm import tqdm
 
-from img_utils import in_polygon, filter_baseline_dF_comp, get_target_folders_v2, read_xml_file
+from img_utils import *
 
 save_location = '/mnt/md0/'
 data_type = 'BRUKER'
 date = '01072025'
-file_num = 4
-stim_file= 4
+file_num = 1
+stim_file= 1
 optical_zoom = 2
 dur_resp  = 2.5 # seconds
 
 # Uncomment as each is verified in behavior
-# do_neuropil = False
+do_neuropil = True
 # do_cascade = False
 # is_2p_opto = False
 # is_voltage = False
@@ -36,7 +37,7 @@ dur_resp  = 2.5 # seconds
 #   DeepInterpolation removes these when run.
 is_deep_interp = False
 
-chnk = int(1e4) # Number of frames to process at a time
+chnk = int(1e3) # Number of frames to process at a time
 
 # Cascade filenames here ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -47,16 +48,18 @@ folder_list = get_target_folders_v2(save_location+data_type+'/', date,file_num, 
 #       for data checking and validation reasons.
 target_folder = folder_list[0]
 os.chdir(target_folder)
+print(f'Starting CE creation for {target_folder}')
 
 ## ROI file handling
 try:
     roi_list = roifile.roiread('RoiSet.zip')
+    #code.interact(local=dict(globals(), **locals())) 
 except FileNotFoundError:
-    print(f'No ROI file for {target_folder}')
-
-#code.interact(local=dict(globals(), **locals())) 
-num_cells = len(roi_list)
-located_dend_roi = any(roi.roitype == 5 for roi in roi_list)
+    print(f'Halting. No ROI file for {target_folder}')
+    sys.exit(1) # kill
+else:
+    num_cells = len(roi_list)
+    located_dend_roi = any(roi.roitype == 5 for roi in roi_list)
 
 ## Grabbing .h5 processed calcium movie handling - 
 try:
@@ -65,24 +68,31 @@ try:
     else:
         h = h5py.File('registered.h5', 'r')
 except FileNotFoundError:
-    print(f'Processed file not found. \n Check destination or "is_deep_interp" flag.')
+    print(f'Halting. Processed calcium movie file not found. \n Check destination and/or "is_deep_interp" flag.')
+    sys.exit(1) # kill
 
 dat_name = [key for key in h.keys()][0]
-num_frames, sizeX, sizeY = h[dat_name].shape
-
+num_frames, size_x, size_y = h[dat_name].shape
 
 ## Grabbing cell masks -
-x = np.linspace(0, sizeX-1, sizeX)
-y = np.linspace(0, sizeY-1, sizeY)
+x = np.linspace(0, size_x-1, size_x)
+y = np.linspace(0, size_y-1, size_y)
 x, y = np.meshgrid(x, y)
-mask2d = np.zeros((num_cells, sizeX, sizeY))
+mask2d = np.zeros((num_cells, size_x, size_y))
+neuropil_mask = np.zeros((size_x,size_y))
 
 for cc in tqdm(range(num_cells), desc="getting masks", ncols=75):
-    nmCoord = roi_list[cc].coordinates()
-    mask2d[cc,:,:] = in_polygon(x, y, nmCoord[:,0], nmCoord[:,1])
+    nm_coord = roi_list[cc].coordinates()
+    if roi_list[cc].roitype == 5:       
+        mask2d[cc,:,:] = gen_polyline_roi(nm_coord=nm_coord, d_width=roi_list[cc].stroke_width)
+    else:
+        mask2d[cc,:,:] = in_polygon(x, y, nm_coord[:,0], nm_coord[:,1])
+    neuropil_mask += mask2d[cc,:,:]
+
 
 ## Using cell masks to extract raw cell traces -
 raw_cell_traces = np.zeros((num_frames, num_cells))
+raw_neuropil    = np.zeros((num_frames))
 dff = np.zeros((num_frames, num_cells))
 
 for f_i in tqdm(range(math.ceil(num_frames / chnk)), desc="Extracting...", ncols=75):
@@ -93,11 +103,24 @@ for f_i in tqdm(range(math.ceil(num_frames / chnk)), desc="Extracting...", ncols
     for cc in range(num_cells):
         nz = np.nonzero(mask2d[cc,:,:])
         raw_cell_traces[start:stop, cc] = np.mean(imgstack[:,nz[0], nz[1]], axis=1)
+    
+    # Need to get nz_neuropil as well
+    if do_neuropil:
+        nz = np.nonzero(neuropil_mask)
+        raw_neuropil[start:stop] = np.mean(imgstack[:,nz[0], nz[1]], axis=1)
 
-print("Calculating dff for all cells")
-for cc in range(num_cells):
+if not is_deep_interp:
+    dff = dff[30:, :]
+    raw_neuropil = raw_neuropil[30:]
+
+## Getting dF/F from raw traces
+for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
     dff[:,cc] = filter_baseline_dF_comp(raw_cell_traces[:,cc], 99*4+1)
-print("done")
+
+if do_neuropil:
+    dff_neuropil = filter_baseline_dF_comp(raw_neuropil, 99*4+1)
+
+code.interact(local=dict(globals(), **locals())) 
 
 if stim_file > -1:
     print('Grabbing two-photon frametimes')
@@ -120,6 +143,7 @@ if stim_file > -1:
 
     elif 'SCANIMAGE' in data_type:
         print('scanimage two-photon timeframes must be implemented')
+        sys.exit(1)
 
     print(f'Num frametriggers detected: {frame_triggers.shape[0]}')
     print('Getting stimulus times and syncing with two-photon frame times...')
@@ -181,3 +205,6 @@ code.interact(local=dict(globals(), **locals()))
 ### - raw signal looks correct
 ### - dff/filter_baseline_dF_comp results are correct
 ### - neuropil signal looks correct
+
+# Want to signal correct execution, but does it matter?
+sys.exit(0)
