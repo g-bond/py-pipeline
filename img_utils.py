@@ -1,14 +1,17 @@
 # A module to handle common formats for calcium movies.
 import os
+import xml.etree.ElementTree as ET
 import code
 
 import cv2
-import glob
+from glob import glob
 import h5py
 import tifffile
 import numpy as np
 
 from matplotlib import path
+from scipy import signal
+from statistics import median
 
 def in_polygon(xq, yq, xv, yv):
     shape = xq.shape
@@ -37,9 +40,73 @@ def filter_baseline_dF_comp(raw, pts = 99):
     raw_new = raw_new - raw_newlpf
     
     return raw_new
+"""
+def replace_missing_frame_triggers(frame_triggers):
+    '''
+    Replace any relative frametriggers that may be missing from a series
 
-## Need
-#def get_target_folders_v2(loc, date, fnames, filetype):
+    Parameters:
+        frame_triggers (np.array): 1D array of relative frame times from
+            start of recording. Assumes 10kHz sampling rate.
+    Returns:
+        frame_triggers_adj (np.array): 1D array of relative frame times from
+            start of recording. If any triggers are missing, now included.
+    '''
+    med_period = median(np.diff(frame_triggers))
+    for k in range(1:frame_triggers.shape)
+"""    
+
+def read_xml_file(fname):
+    '''
+    Extract frame timing information from BRUKER output file.
+    
+    Parameters:
+        fname (str): String indicating path to read XML data from.
+    Returns:
+        rec_info (np.array): Array containing relative frame timing information.
+    '''
+    try:
+        tree = ET.parse(fname)
+        root = tree.getroot()
+        # Count the number, then get the values
+        rel_frametimes = [child.attrib['relativeTime'] for child in root[2] if child.tag == 'Frame']
+        return np.array(rel_frametimes).astype('float')
+    
+    except FileNotFoundError:
+        print(f'File {fname} was not found.')
+    except ET.ParseError:
+        print(f'Error parsing XML file {fname}')
+    except Exception as e:
+        print('Exception during read_xml_file: ', e)
+
+
+def get_target_folders_v2(loc, date, fnames, filetype='TSeries'):
+    '''
+    Grab folder(s) that match given patterns.
+    loc (str): Location to parent directory within which to search.
+    date (str): MMDDYYYY date string to search for
+    fnames (list or int): List of names to gather based on this querey.
+    filetype (str): Specify which kind of file from the scanner is required.
+    '''
+    if 'BRUKER' in loc:
+        folder_list = sorted(glob(loc + filetype + '-' + date + '*'))
+    elif 'SCANIMAGE' in loc:
+        date_str = '-'.join([date[4:], date[:2], date[2:4]])
+        folder_list = sorted(glob(loc + filetype + '_' + date_str + '*'))
+    
+    assert len(folder_list) > 0, 'No target folders matched given specification.'
+
+    if isinstance(fnames, int):
+        suffixes = ["{:03d}".format(fnames)]
+    else:
+        suffixes = ["{:03d}".format(fname) for fname in fnames]
+
+    dir_list = []
+    for f in folder_list:
+        if os.path.isdir(f) and any(f.endswith(suffix) for suffix in suffixes):
+            dir_list.append(f)
+    
+    return dir_list
 
 
 def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, frame_offset=False, offset=30):
@@ -59,7 +126,7 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
             None - Writes .h5 file to disk at 'h5_savename' containing calcium movie data.
     '''
 
-    tif_fnames = sorted(glob.glob(os.path.join(tif_dir, "*.tif")))
+    tif_fnames = sorted(glob(os.path.join(tif_dir, "*.tif")))
     # Don't know how to get width, height without loading into memory.
     #first_tif_handle = tifffile.TiffFile(tif_fnames[0])
     #stack_depth = len(first_tif_handle.pages)
@@ -267,7 +334,7 @@ def deinterleave_movies(parent_dir, scope_format):
     is_bruker = 'BRUKER' in parent_dir
     is_scanimage = 'SCANIMAGE' in parent_dir
 
-    fnames = glob.glob(os.path.join(parent_dir, '*.tif'))
+    fnames = glob(os.path.join(parent_dir, '*.tif'))
     assert len(fnames) > 0, "No valid tif files found in {}".format(parent_dir)
     
     #os.mkdir(parent_dir + '//ch1')
