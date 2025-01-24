@@ -75,7 +75,7 @@ def filter_baseline_dF_comp(raw, pts = 99):
     raw_new = raw_new - raw_newlpf
     
     return raw_new
-"""
+
 def replace_missing_frame_triggers(frame_triggers):
     '''
     Replace any relative frametriggers that may be missing from a series
@@ -87,9 +87,23 @@ def replace_missing_frame_triggers(frame_triggers):
         frame_triggers_adj (np.array): 1D array of relative frame times from
             start of recording. If any triggers are missing, now included.
     '''
+    new_frame_triggers = []
     med_period = median(np.diff(frame_triggers))
-    for k in range(1:frame_triggers.shape)
-"""    
+    for k in range(1, frame_triggers.shape[0]):
+        if (frame_triggers[k] - frame_triggers[k-1]) > (med_period + med_period/4):
+            new_frame_triggers.append(frame_triggers[k-1] + med_period)
+        new_frame_triggers.append(frame_triggers[k])
+    return np.array([new_frame_triggers])
+ 
+def neuropil_subtraction():
+    '''
+    Robustly remove out the neuropil signal from cell ROIs
+
+    Parameters:
+        asdf
+    Returns:
+        asdf
+    '''
 
 def read_xml_file(fname):
     '''
