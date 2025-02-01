@@ -14,6 +14,8 @@ from scipy import signal
 from statistics import median
 from skimage.draw import polygon2mask
 
+from tqdm import tqdm
+
 def gen_polyline_roi(nm_coord, d_width=10.0, size_x=512, size_y=512):
     '''
     Create a mask for dendrite ROI
@@ -95,14 +97,61 @@ def replace_missing_frame_triggers(frame_triggers):
         new_frame_triggers.append(frame_triggers[k])
     return np.array([new_frame_triggers])
  
-def neuropil_subtraction():
+def genfromtxt_with_progress(filename, **kwargs):
     '''
-    Robustly remove out the neuropil signal from cell ROIs
+    np.genfromtxt call, but wrapping file with tqdm to add a progress bar
+        while iterating over the file lines.
+    
+    Parameters:
+        filename (str): Destination to read from. Local or absolute.
+        **kwargs - arguments for np.genfromtxt.
+    Returns:
+        (np.array): Results of genfromtxt call.
+    '''
+    with open(filename, 'r') as f:
+        total_lines = sum(1 for line in f)
+    with open(filename, 'r') as f:
+        return np.genfromtxt(tqdm(f, total=total_lines), **kwargs)
+ 
+def neuropil_subtraction(dff_mat, dff_neuro, is_soma):
+    '''
+    Remove out the neuropil signal from somas.
+    Uses statsmodels 'RLM'.
 
     Parameters:
-        asdf
+        dff_mat (np.array): 2d array of (time, cell) for the dff trace per mask
+        dff_neuro (np.array): 1d array of dff trace for the neuropil signal
+        is_soma (list of Bool): Identity of whether cells are somas or not.
     Returns:
-        asdf
+        dff_depilled (np.array): 2d array of (time, cell).
+            Contains dff_mat, but fit to the slope found 
+        dff_slopes (np.array): 1d array of each slope found through the robustfit process.
+    '''
+    # statsmodels.sm RLM (Robust Linear Model) attempt
+    # scikit-learn attempt - RANSAC Regressor
+    #
+    # From MATLAB robustfit...
+    #   The algorithm uses iteratively reweighted least squares with the bisquare weighting function. 
+    #   By default, ROBUSTFIT adds a column of ones to X, corresponding to a
+    #   constant term in the first element of B.  Do not enter a column of ones
+    #   directly into the X matrix.
+
+def dendrite_subtraction():
+    '''
+    Remove dendrite signal from spine ROIs.
+    Parameters:
+        -
+    Returns:
+        -
+    '''
+
+def gen_stim_cyc():
+    '''
+    Gather waveforms for each stimulus condition, for each ROI.
+    Parameters:
+        - 
+    Returns:
+        -
     '''
 
 def read_xml_file(fname):
