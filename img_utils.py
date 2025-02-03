@@ -139,6 +139,7 @@ def neuropil_subtraction(dff_mat, dff_neuro, is_soma):
 def dendrite_subtraction():
     '''
     Remove dendrite signal from spine ROIs.
+    Navigate it here once you have a way to get it out of main script.
     Parameters:
         -
     Returns:
@@ -148,6 +149,7 @@ def dendrite_subtraction():
 def gen_stim_cyc():
     '''
     Gather waveforms for each stimulus condition, for each ROI.
+    Navigate it here once you have a way to get it out of main script.
     Parameters:
         - 
     Returns:
