@@ -31,7 +31,12 @@ if gpus:
 
 
 
-sessions_to_run = ["/mnt/md0/BRUKER/TSeries-11042024-1556-031"]
+sessions_to_run = ["/mnt/md0/BRUKER/TSeries-11032024-1313-003",
+                   "/mnt/md0/BRUKER/TSeries-11032024-1313-005",
+                   "/mnt/md0/BRUKER/TSeries-11032024-1313-007",
+                   "/mnt/md0/BRUKER/TSeries-11032024-1313-011",
+                   "/mnt/md0/BRUKER/TSeries-11032024-1313-013",
+                   "/mnt/md0/BRUKER/TSeries-11032024-1313-015"]
 
 if __name__ == '__main__':
     for i in range(len(sessions_to_run)):
@@ -43,7 +48,7 @@ if __name__ == '__main__':
         f = h5py.File(data_file, "a")
         rename = False
         try:
-            total_frames = f["mov"].shape=[0]
+            total_frames = f["mov"].shape[0]
             rename = True
         except:
             total_frames = f["data"].shape[0]
@@ -138,7 +143,7 @@ if __name__ == '__main__':
         
         training_param[
             "nb_times_through_data"
-        ] = 2
+        ] = 1
         # if you want to cycle through the entire data.
         # Too many iterations will cause noise overfitting
         
@@ -159,10 +164,14 @@ if __name__ == '__main__':
         )
 
         # Where do you store ongoing training progress
+        #jobdir = os.path.join(
+        #    ".", training_param["model_string"] + "_" + run_uid,
+        #)
         jobdir = os.path.join(
-            ".", training_param["model_string"] + "_" + run_uid,
+            sessions_to_run[i], training_param["model_string"] + "_" + run_uid,
         )
         training_param["output_dir"] = jobdir
+        print(jobdir)
 
         try:
             os.mkdir(jobdir)

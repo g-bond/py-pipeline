@@ -25,8 +25,8 @@ from img_utils import *
 
 save_location = '/mnt/md0/'
 data_type = 'BRUKER'
-date = '11042024'
-file_num = 39
+date = '11032024'
+file_num = 15
 stim_file= -1
 optical_zoom = 2
 dur_resp  = 2.5 # seconds
@@ -42,7 +42,7 @@ is_2p_opto = False
 # 30 frames added to movie start at .h5 conversion.
 #   If DeepInterpolation is not run, these must be accounted for.
 #   DeepInterpolation removes these when run.
-is_deep_interp = False
+is_deep_interp = True
 
 frame_period = 0.033
 chnk = int(1e3) # Number of frames to process at a time
@@ -134,6 +134,8 @@ if not is_deep_interp:
 dff = np.zeros((num_frames, num_cells))
 for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
     dff[:,cc] = filter_baseline_dF_comp(raw_cell_traces[:,cc], 99*4+1)
+
+code.interact(local=dict(globals(), **locals())) 
 
 if do_neuropil:
     dff_neuropil = filter_baseline_dF_comp(raw_neuropil, 99*4+1)

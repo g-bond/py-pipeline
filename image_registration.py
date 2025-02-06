@@ -52,22 +52,21 @@ def register_one_session(parent_dir, mc_dict, keep_memmap, save_sample, sample_n
 
     mc.motion_correct(save_movie=True)
 
- # Storing results in HDF5 for DeepInterpolation
+ 
+ # First, save image shifts to work directory
     if mc_dict['pw_rigid']:
         numframes = len(mc.x_shifts_els)
+        np.savetxt(os.path.join(parent_dir, 'nonrigid_x_shifts.csv'), mc.x_shifts_els, delimiter=',')
+        np.savetxt(os.path.join(parent_dir, 'nonrigid_y_shifts.csv'), mc.y_shifts_els, delimiter=',')
     else:
         numframes = len(mc.shifts_rig)
+        np.savetxt(os.path.join(parent_dir, 'rigid_shifts.csv'), mc.shifts_rig, delimiter=',')
 
-    #os.replace(fnames[0], parent_dir + "//registered.h5")
-    #datafile = h5py.File(parent_dir + '//registered.h5', 'w')
+#  Storing results in HDF5 for DeepInterpolation
     os.replace(fnames[0], os.path.join(parent_dir, 'registered.h5'))
     datafile = h5py.File(os.path.join(parent_dir, 'registered.h5'), 'w')
     datafile.create_dataset("mov", (numframes, 512, 512))
-    #datafile.create_dataset("mov", (numframes, 128, 128))
-    #code.interact(local=dict(globals(), **locals())) 
     
-    # Behavior changed since last stable
-    #fnames_new = glob.glob(parent_dir + "//*.mmap")
     fnames_new = mc.mmap_file
     frames_written = 0
     

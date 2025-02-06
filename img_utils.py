@@ -10,6 +10,11 @@ import tifffile
 import numpy as np
 
 from matplotlib import path
+
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
+
 from scipy import signal
 from statistics import median
 from skimage.draw import polygon2mask
@@ -209,7 +214,31 @@ def get_target_folders_v2(loc, date, fnames, filetype='TSeries'):
     return dir_list
 
 
-def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, frame_offset=False, offset=30):
+def pearson_r_from_movie(h5_path, template_start=0,template_end=1000):
+    '''
+    Characterizes amount of movement across a calcium movie over time.
+    Not recommended anymore. After using with enough movies, it's not
+    that informative of a measure compared to viewing sample tif stacks.
+    
+    Parameters:
+        h5_path (str): String encoding the path to the movie to see.
+    Returns:
+        corrs (np.array): 1D array for Pearson's r per frame of given movie.
+    '''
+    with h5py.File(h5_path, 'r') as f:
+        key = 'mov' if 'mov' in f.keys() else 'data'
+        data = f[key]
+        n_frames = data.shape[0]
+        
+        template = np.mean(data[template_start:min(template_end, n_frames) :, :], axis=0)
+        template = template.flatten()
+
+        r_vec = np.empty((n_frames,))
+        for i in range(n_frames):
+            r_vec[i] = np.corrcoef(template, data[i,:,:].flatten())[0,1]
+    return r_vec
+
+def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, frame_offset=True, offset=30):
     '''
     Convert .tif stacks from BRUKER/SCANIMAGE to monolithic .h5 files.
     If frame_offset, frames from the start and end of the series are appended to either
@@ -217,7 +246,7 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
     given to DeepInterpolation.
 
         Parameters:
-            tif_dir (str): Path to directory containing .tif files to convert.
+            tif_dir (str): String for path of directory to convert tifs in.
             h5_savename (str): Name of conversion .h5 file to save.
             h5_key (str): h5 key to save data under. CaImAn assumes 'mov'.
             delete_tiffs (bool): Whether to remove .tif files during conversion
@@ -225,7 +254,7 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
         Returns:
             None - Writes .h5 file to disk at 'h5_savename' containing calcium movie data.
     '''
-
+    #assert len(tif_fnames) > 0, "List of tifs to convert must be nonzero in length."
     tif_fnames = sorted(glob(os.path.join(tif_dir, "*.tif")))
     # Don't know how to get width, height without loading into memory.
     #first_tif_handle = tifffile.TiffFile(tif_fnames[0])
@@ -278,7 +307,11 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
             last_stack_length = last_stack.shape[0]
             del first_stack
             del last_stack
-    
+    # Just to guarantee last_stack_length
+    else:
+        last_stack = tifffile.imread(tif_fnames[-1])
+        last_stack_length = last_stack.shape[0]
+
     # first and last offset, all regular-length stacks, last stack
     out_data_frames = (offset * 2) + (stack_depth * (len(tif_fnames) - 1)) + last_stack_length
     # Writing the main movie itself
@@ -290,8 +323,8 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
     if frame_offset:
         f_out[h5_key][0:offset, :, :] = np.flip(first_frames, axis=0)
         write_end_ind += 30
-
-    for i in range(len(tif_fnames) - 1):
+    
+    for i in tqdm(range(len(tif_fnames) - 1), desc="Writing all but last stack...", ncols=75):
         this_stack_data = tifffile.imread(tif_fnames[i], is_ome=False)
         write_start_ind = write_end_ind
         write_end_ind = write_start_ind + stack_depth
@@ -301,12 +334,55 @@ def tif_stacks_to_h5(tif_dir, h5_savename, h5_key='mov', delete_tiffs=False, fra
     # This will also require knowing if the last stack was at least 'offset' many pages.
     last_stack = tifffile.imread(tif_fnames[-1], is_ome=False)
     write_start_ind = write_end_ind
-
+    
+    print('Writing last stack...')
     f_out[h5_key][write_start_ind:-offset, :, :] = last_stack
     f_out[h5_key][-offset:, :, :] = last_frames
 
     f_out.close()
 
+def grab_visuals(dir, start_ind=0, end_ind=1000):
+    '''
+    ImageJ/FIJI refuses to load singular .ome.tif files anymore.
+    This makes samples for directories involved so I can do my job.
+    
+    Parameters:
+        dir (str): Directory to take samples from per channel.
+        start_ind (int): Time index to start sample from.
+        end_ind (int): Time index to end sample from.
+
+    Returns:
+        Nothing, just creates files in sample directory of the given dir.
+
+    Ex.
+    ~ workdirs = sorted(glob("/mnt/md0/BRUKER/TSeries-11032024"))
+    ~ for w in workdirs:
+    ~   grab_visuals(w)
+    '''
+    try:
+        print(f'Creating samples for {dir}')
+        os.chdir(dir)
+        ch1_fnames = sorted(glob("TSeries*Ch1*.ome.tif"))
+        ch2_fnames = sorted(glob("TSeries*Ch2*.ome.tif"))
+        
+        if  not os.path.isdir(os.path.join(dir, 'samples')) and (len(ch1_fnames) > 0 or len(ch2_fnames) > 0):
+            os.mkdir(os.path.join(dir, 'samples'))
+            print('New samples directory created')
+
+        if len(ch1_fnames) > 0:
+            ch1_savename = os.path.join('samples', f'ch1_f{start_ind}-{end_ind}.tif')
+            ch1_first = tifffile.imread(ch1_fnames[0], is_ome=False)
+            tifffile.imwrite(ch1_savename, ch1_first[start_ind:end_ind, :, :])
+            print('Saved Ch1 sample')
+        
+        if len(ch2_fnames) > 0:
+            ch2_savename = os.path.join('samples', f'ch2_f{start_ind}-{end_ind}.tif')
+            ch2_first = tifffile.imread(ch2_fnames[0], is_ome=False)
+            tifffile.imwrite(ch2_savename, ch2_first[start_ind:end_ind, :, :])
+            print('Saved Ch2 sample')
+
+    except IndexError:
+        print(f'Indices of {start_ind} and {end_ind} not working. :(')
 
 def sample_stack_from_h5(h5_path, save_path, start_frame, end_frame):
     '''
@@ -326,8 +402,6 @@ def sample_stack_from_h5(h5_path, save_path, start_frame, end_frame):
             e (exception): If exception is raised while writing data.
     
     '''
-    # Assert h5 exists
-    #f = h5py.File(h5_path, "r")
     with h5py.File(h5_path, 'r') as f:
         key = 'mov' if 'mov' in f.keys() else 'data'
         data = f[key]

@@ -4,7 +4,7 @@ import glob
 import h5py
 import code
 
-sys.path.append('/home/schollab-beyonce/Documents/deepinterpolation-0.2.0')
+sys.path.append('/home/schollab-dion/Documents/deepinterpolation-0.2.0')
 from deepinterpolation.generator_collection import SingleTifGenerator, OphysGenerator
 from deepinterpolation.inference_collection import core_inference
  
@@ -25,6 +25,20 @@ if gpus:
         print(e)
 
 
+sessions_to_run = ['/mnt/md0/BRUKER/TSeries-11032024-1313-001',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-002',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-003',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-004',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-007',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-008',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-009',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-011',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-012',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-013',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-014',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-015',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-016',
+                   '/mnt/md0/BRUKER/TSeries-11032024-1313-017']
 
 if __name__ == '__main__':
     for i in range(len(sessions_to_run)):
@@ -60,8 +74,8 @@ if __name__ == '__main__':
 
         generator_param["batch_size"] = 1 # Batch size >1 crashes due to OOM
         generator_param["start_frame"] = 0
-        #generator_param["end_frame"] = 1100  # Just a sample to check model quality.
-        generator_param["end_frame"] = -1 # -1 to go to the end.
+        generator_param["end_frame"] = 1100  # Just a sample to check model quality.
+        #generator_param["end_frame"] = -1 # -1 to go to the end.
         
         generator_param[
             "randomize"
@@ -78,7 +92,7 @@ if __name__ == '__main__':
         # Replace this path to where you want to store your output file
         inference_param[
             "output_file"
-        ] = os.path.join(sessions_to_run[i], "inference_results.h5")
+        ] = os.path.join(sessions_to_run[i], "inference_results_short.h5")
 
         jobdir = "./"
 
