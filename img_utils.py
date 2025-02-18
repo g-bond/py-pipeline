@@ -184,7 +184,6 @@ def read_xml_file(fname):
     except Exception as e:
         print('Exception during read_xml_file: ', e)
 
-
 def get_target_folders_v2(loc, date, fnames, filetype='TSeries'):
     '''
     Grab folder(s) that match given patterns.
@@ -214,12 +213,13 @@ def get_target_folders_v2(loc, date, fnames, filetype='TSeries'):
     return dir_list
 
 
+
 def pearson_r_from_movie(h5_path, template_start=0,template_end=1000):
     '''
     Characterizes amount of movement across a calcium movie over time.
     Not recommended anymore. After using with enough movies, it's not
     that informative of a measure compared to viewing sample tif stacks.
-    
+
     Parameters:
         h5_path (str): String encoding the path to the movie to see.
     Returns:
@@ -540,14 +540,5 @@ def deinterleave_movies(parent_dir, scope_format):
         assert False, "{} is improper scope format. \
                 Give either BRUKER or SCANIMAGE as second argument.".format(scope_format)
         
-        
-
-# Only including this here for testing purposes - gnb, Dec'24
-def main():
-    test_data_dir = '/home/gnb/Documents/pipeline_test_data/BRUKER/TSeries-03282023-1243-012/temp'
-    h5_savename = os.path.join(test_data_dir, 'out.h5')
-    tif_stacks_to_h5(test_data_dir, h5_savename=h5_savename, frame_offset=True)
-
-if __name__ == '__main__':
-    main()
+        s
 

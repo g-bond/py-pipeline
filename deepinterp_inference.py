@@ -25,20 +25,43 @@ if gpus:
         print(e)
 
 
-sessions_to_run = ['/mnt/md0/BRUKER/TSeries-11032024-1313-001',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-002',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-003',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-004',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-007',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-008',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-009',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-011',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-012',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-013',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-014',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-015',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-016',
-                   '/mnt/md0/BRUKER/TSeries-11032024-1313-017']
+sessions_to_run = ['/mnt/md0/BRUKER/TSeries-11042024-1556-001',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-002',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-003',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-004',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-005',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-006',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-007',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-008',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-009',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-010',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-011',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-013',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-014',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-016',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-017',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-018',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-019',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-020',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-021',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-022',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-023',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-024',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-025',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-026',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-027',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-029',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-030',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-031',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-032',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-033',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-034',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-035',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-036',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-037',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-038',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-039',
+                   '/mnt/md0/BRUKER/TSeries-11042024-1556-040']
 
 if __name__ == '__main__':
     for i in range(len(sessions_to_run)):
@@ -74,8 +97,8 @@ if __name__ == '__main__':
 
         generator_param["batch_size"] = 1 # Batch size >1 crashes due to OOM
         generator_param["start_frame"] = 0
-        generator_param["end_frame"] = 1100  # Just a sample to check model quality.
-        #generator_param["end_frame"] = -1 # -1 to go to the end.
+        #generator_param["end_frame"] = 1100  # Just a sample to check model quality.
+        generator_param["end_frame"] = -1 # -1 to go to the end.
         
         generator_param[
             "randomize"
@@ -92,7 +115,7 @@ if __name__ == '__main__':
         # Replace this path to where you want to store your output file
         inference_param[
             "output_file"
-        ] = os.path.join(sessions_to_run[i], "inference_results_short.h5")
+        ] = os.path.join(sessions_to_run[i], "inference_results.h5")
 
         jobdir = "./"
 
