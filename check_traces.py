@@ -51,7 +51,7 @@ def compare_reg_inf_ends(dirname, chnk=1000, middle=True):
         
 
 if __name__ == '__main__':
-    check = False
+    just_check_size = False
     workdirs = sorted(glob('/mnt/md0/BRUKER/TSeries-11042024*'))
 
     for w in workdirs:
@@ -65,7 +65,7 @@ if __name__ == '__main__':
             print(f'File not found for {w}')
             continue
 
-        if not check:
+        if not just_check_size:
             compare_reg_inf_ends(w)
         else:
             f = h5py.File(os.path.join(w, 'registered.h5'), 'r')

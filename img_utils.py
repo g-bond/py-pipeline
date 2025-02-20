@@ -1,9 +1,9 @@
 # A module to handle common formats for calcium movies.
 import os
+import sys
 import xml.etree.ElementTree as ET
 import code
 
-import cv2
 from glob import glob
 import h5py
 import tifffile
@@ -20,6 +20,9 @@ from statistics import median
 from skimage.draw import polygon2mask
 
 from tqdm import tqdm
+
+import wx
+import wx.lib.agw.multidirdialog as MDD
 
 def gen_polyline_roi(nm_coord, d_width=10.0, size_x=512, size_y=512):
     '''
@@ -65,6 +68,25 @@ def in_polygon(xq, yq, xv, yv):
     p = path.Path([(xv[i], yv[i]) for i in range(xv.shape[0])])
     return p.contains_points(q).reshape(shape)
 
+def get_h5_size(h5_path):
+    '''
+    Just return the size of the given .h5 file.
+    
+    Parameters:
+        h5_path(str): Path to h5 file.
+    Returns:
+        dims (tuple or None): Dimensions of the file.
+            If file does not exist, return None.
+    '''
+    assert h5_path.endswith(('.h5', '.hdf5')), f"{h5_path} does not end with .h5 or .hdf5."
+    try:
+        with h5py.File(h5_path, 'r') as f:
+            key = 'mov' if 'mov' in f.keys() else 'data'
+            return f[key].shape
+    except FileNotFoundError:
+        print("Cannot give size for f{h5_path} because it wasn't found.")
+        return None
+    
 
 def filter_baseline_dF_comp(raw, pts = 99):
     F_temp = raw
@@ -457,7 +479,7 @@ def std_dev_from_h5(h5_path, start_frame, end_frame, std_width, std_jmps):
         except Exception as e:
             print("Error while saving: ", e)
 
-
+"""
 def avi_from_h5(h5_path, save_path, start_index, end_index, fps=30, chunk_size=1000):
     '''
     Create an .avi movie from a .h5 movie.
@@ -493,7 +515,7 @@ def avi_from_h5(h5_path, save_path, start_index, end_index, fps=30, chunk_size=1
                     video_out.write(frame_8bit)
         finally:
             video_out.release()
-
+"""
 
 def deinterleave_movies(parent_dir, scope_format):
     """

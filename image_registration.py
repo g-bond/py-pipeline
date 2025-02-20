@@ -23,7 +23,7 @@ try:
 except NameError:
     pass
 
-
+import sys
 import caiman as cm
 from caiman.motion_correction import MotionCorrect
 from caiman.source_extraction.cnmf import cnmf as cnmf
@@ -33,6 +33,11 @@ from caiman.summary_images import local_correlations_movie_offline
 
 import tifffile
 
+from wx_registration_gui import get_registration_options
+from img_utils import tif_stacks_to_h5
+
+# These imports are a mess and need to be adjusted.
+# Why is this here?
 global mc
 
 def register_one_session(parent_dir, mc_dict, keep_memmap, save_sample, sample_name):
@@ -103,14 +108,15 @@ def register_one_session(parent_dir, mc_dict, keep_memmap, save_sample, sample_n
     datafile.close()
 
 
-def register_bulk(sessions_to_run, sparse=False):
+def register_bulk(sessions_to_run, process_selections):
     """
-    Function to run CaImAn's motion correction on prepared .h5 stack.
+    Script to run CaImAn's motion correction on prepared .h5 stack.
 
     Parameters:
         sessions_to_run (list): List of strings for each file directory to find data in.
-        sparse (bool): True runs piecewise-nonrigid registration (NoRMCorre) after rigid registration.
-                       False runs only rigid.
+        process_selections(list of np.array): Logical arrays for determining what operations
+            must be run for each session.
+            Currently, this is(.tif -> .h5), (first_rigid), (second_rigid), (NoRMCorre)
     Returns:
         Nothing. Does disk operations, creates new .h5 for registered calcium movie.
     """
@@ -147,13 +153,25 @@ def register_bulk(sessions_to_run, sparse=False):
     time_deltas = []
     for i in range(0,len(sessions_to_run)):
         print(sessions_to_run[i])
+        n_procs = 0
         t_start = datetime.now()
-        #stacks_to_hdf5(sessions_to_run[i], delete_tiffs=True)
-        register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False,save_sample=True, sample_name="01_rigid.tif")
-        if sparse:
+        if process_selections[0,i]:
+            stacks_to_hdf5(sessions_to_run[i], delete_tiffs=True)
+        if process_selections[1,i]:
+            n_procs +=1
+            register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False,save_sample=True, sample_name=f"{n_procs:02}_rigid.tif")
+        if process_selections[2,i]:
+            register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False,save_sample=True, sample_name=f"{n_procs:02}_rigid.tif")
+            n_procs+=1
+        if process_selections[3,i]:
             mc_dict['pw_rigid'] = True
-            register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False, save_sample=True, sample_name="02_nonrigid.tif")
+            register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False, save_sample=True, sample_name=f"{n_procs:02}_nonrigid.tif")
+            n_procs+=1
+    
 
-
-
-
+if __name__ == '__main__':
+    # HDF5 to tif, first registration, second_registration, NoRMCorre
+    workdirs, proc_opts = get_registration_options()
+    code.interact(local=dict(globals(), **locals())) 
+    if workdirs:
+        register_bulk(workdirs, proc_opts)
