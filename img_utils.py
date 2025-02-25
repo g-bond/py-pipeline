@@ -192,9 +192,9 @@ def replace_missing_frame_triggers(frame_triggers):
         frame_triggers_adj (np.array): 1D array of relative frame times from
             start of recording. If any triggers are missing, now included.
     '''
-    new_frame_triggers = []
+    new_frame_triggers = [frame_triggers[0]]
     med_period = median(np.diff(frame_triggers))
-    for k in range(1, frame_triggers.shape[0]):
+    for k in range(1,frame_triggers.shape[0]):
         if (frame_triggers[k] - frame_triggers[k-1]) > (med_period + med_period/4):
             new_frame_triggers.append(frame_triggers[k-1] + med_period)
         new_frame_triggers.append(frame_triggers[k])
@@ -214,7 +214,8 @@ def genfromtxt_with_progress(filename, **kwargs):
     with open(filename, 'r') as f:
         total_lines = sum(1 for line in f)
     with open(filename, 'r') as f:
-        return np.genfromtxt(tqdm(f, total=total_lines), **kwargs)
+        return np.genfromtxt(tqdm(f, total=total_lines, ncols=75), **kwargs)
+        #return np.genfromtxt(tqdm(f, total=total_lines), **kwargs)
  
 def neuropil_subtraction(dff_mat, dff_neuro, is_soma):
     '''

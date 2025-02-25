@@ -136,11 +136,10 @@ dff = np.zeros((num_frames, num_cells))
 for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
     dff[:,cc] = filter_baseline_dF_comp(raw_cell_traces[:,cc], 99*4+1)
 
-code.interact(local=dict(globals(), **locals())) 
-
 if do_neuropil:
     dff_neuropil = filter_baseline_dF_comp(raw_neuropil, 99*4+1)
 
+code.interact(local=dict(globals(), **locals())) 
 if stim_file > -1:
     print('Grabbing two-photon frametimes')
     if 'BRUKER' in data_type:
@@ -150,10 +149,10 @@ if stim_file > -1:
         if frame_triggers[0] > 340:
             print('First 2p frame was dropped!')
         
-        frame_triggers = replace_missing_frame_triggers(frame_triggers)
+        #frame_triggers = replace_missing_frame_triggers(frame_triggers)
 
         psychopy_loc = data_type + '_PSYCHOPY'
-        voltage_files = glob('*.csv') # already in datadir
+        voltage_files = glob('*VoltageRecording*.csv') # already in datadir
         assert len(voltage_files) == 1, f'Unique, singular voltage file not found. Check {target_folder}'
         vrec = genfromtxt_with_progress(voltage_files[0], delimiter=',', skip_header=1) # skip one row. uses np.genfromtxt
 
@@ -188,6 +187,7 @@ if stim_file > -1:
         stim_properties = psychopy_file[:,1:]
     else:
         print('Need to test this with a 2p opto file')
+        code.interact(local=dict(globals(), **locals())) 
         sys.exit(1)
 
     assert len(stim_on) == len(stim_id),'Mismatch between stimulus onset times and number of stimulus IDs.'
@@ -203,7 +203,7 @@ if stim_file > -1:
 else:
     print('No stimulus triggers recorded for this dataset.')
 
-
+code.interact(local=dict(globals(), **locals())) 
 # This isn't matching the same regression slopes as MATLAB.
 #   Will need to make sure the algorithm matches the same
 #   weighting choices that MATLAB does.
