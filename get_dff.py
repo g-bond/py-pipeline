@@ -17,6 +17,7 @@ from scipy.signal import medfilt, find_peaks
 import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
+from sklearn.linear_model import HuberRegressor
 
 from tqdm import tqdm
 
@@ -27,15 +28,15 @@ save_location = '/mnt/md0/'
 data_type = 'BRUKER'
 date = '11032024'
 file_num = 15
-stim_file= -1
+stim_file= 15
 optical_zoom = 2
 dur_resp  = 2.5 # seconds
 
 # Uncomment as each is verified in behavior
 do_neuropil = True
-do_cascade = True
+do_cascade = False
 cascade_model = ''
-is_2p_opto = False
+is_2p_opto = True
 # is_voltage = False
 # extract_hotspot = False
 
@@ -208,6 +209,14 @@ else:
 #   weighting choices that MATLAB does.
 #if do_neuropil:
 #    neuropil_subtraction()
+code.interact(local=dict(globals(), **locals())) 
+robust_reg = HuberRegressor()
+for iter in range(len(roi_list)):
+    if roi_list[iter].roitype == 7:
+        robust_reg.fit(den.reshape(-1,1), sp)
+        quick_slope = robust_reg.coef_[0]
+        r = dff[:,iter] - (slope * dff_neuropil)
+
 
 #if do_cascade:
     #cascade_results = cascade_predict('Universal_30Hz_smoothing100ms', dff.T, model_folder=cascade_model_dir)

@@ -21,9 +21,6 @@ from skimage.draw import polygon2mask
 
 from tqdm import tqdm
 
-import wx
-import wx.lib.agw.multidirdialog as MDD
-
 def gen_polyline_roi(nm_coord, d_width=10.0, size_x=512, size_y=512):
     '''
     Create a mask for dendrite ROI
@@ -88,10 +85,88 @@ def get_h5_size(h5_path):
         return None
     
 
+def prctfilt1(x, n=3, blksz=1000, dim=None):
+    """
+    One-dimensional percentile filter with support for chunking and multidimensional arrays.
+    Equivalent to the MATLAB custom prctfilt1 function.
+    
+    Parameters:
+    x : array_like
+        Input signal or array
+    n : int, optional
+        Window size (default = 3)
+    blksz : int, optional
+        Block size for chunking. If None, processes all data at once.
+    dim : int, optional
+        Dimension along which to apply the filter. If None, applies along the first non-singleton dimension.
+        
+    Returns:
+    y : ndarray
+        Filtered signal or array
+    """
+    x = np.asarray(x)
+    
+    # Handle dimension argument
+    if dim is None:
+        # Find first non-singleton dimension
+        dim = 0
+        while dim < x.ndim and x.shape[dim] == 1:
+            dim += 1
+        if dim == x.ndim:
+            return x.copy()  # All dimensions are singleton
+            
+    # Move the desired dimension to the front
+    if dim != 0:
+        perm = np.arange(x.ndim)
+        perm[0], perm[dim] = dim, 0
+        x = np.transpose(x, perm)
+        restore_perm = np.argsort(perm)
+    
+    # Set default block size if not specified
+    if blksz is None:
+        blksz = x.shape[0]
+    
+    # Determine padding size
+    if n % 2 == 1:  # odd
+        m = (n - 1) // 2
+    else:  # even
+        m = n // 2
+    
+    # Create output array
+    y = np.zeros_like(x)
+    
+    # Process each "column" (i.e., along all other dimensions)
+    for idx in np.ndindex(x.shape[1:]):
+        # Extract the vector to filter
+        vector = x[(slice(None),) + idx]
+        
+        # Pad the vector
+        padded = np.zeros(len(vector) + 2*m)
+        padded[m:m+len(vector)] = vector
+        
+        # Process in chunks to save memory
+        for i in range(0, len(vector), blksz):
+            end_idx = min(i + blksz, len(vector))
+            chunk_size = end_idx - i
+            
+            # Create window slices for this chunk
+            windows = np.zeros((n, chunk_size))
+            for j in range(n):
+                windows[j] = padded[i+j:i+j+chunk_size]
+            
+            # Calculate 20th percentile for each window
+            y[(slice(i, end_idx),) + idx] = np.percentile(windows, 20, axis=0)
+    
+    # Restore original dimensions if needed
+    if dim != 0:
+        y = np.transpose(y, restore_perm)
+        
+    return y
+
 def filter_baseline_dF_comp(raw, pts = 99):
     F_temp = raw
     F_temp = np.concatenate((np.repeat(np.mean(F_temp[2:5]),pts),F_temp))
-    F_temp = np.concatenate((F_temp, np.repeat(np.mean(F_temp[-4:-1]),pts)))
+    F_temp = np.concatenate((F_temp, np.repeat(np.mean(F_temp[-5:-2]),pts)))
     # 25th percentile medfilt
     F_temp = signal.medfilt(F_temp, pts)
     # remove padding
@@ -99,8 +174,9 @@ def filter_baseline_dF_comp(raw, pts = 99):
     #code.interact(local=dict(globals(), **locals()))
     raw_new = np.divide((raw - raw_new), raw_new)
     
-    raw_newlpf = signal.medfilt(raw_new, 91)
-    
+    #raw_newlpf = signal.medfilt(raw_new, 91)
+    raw_newlpf = prctfilt1(raw_new, 91)
+
     raw_new = raw_new - raw_newlpf
     
     return raw_new
@@ -172,6 +248,7 @@ def dendrite_subtraction():
     Returns:
         -
     '''
+    
 
 def gen_stim_cyc():
     '''
@@ -479,43 +556,6 @@ def std_dev_from_h5(h5_path, start_frame, end_frame, std_width, std_jmps):
         except Exception as e:
             print("Error while saving: ", e)
 
-"""
-def avi_from_h5(h5_path, save_path, start_index, end_index, fps=30, chunk_size=1000):
-    '''
-    Create an .avi movie from a .h5 movie.
-    
-    Currently has problems.
-    - Normalization per frame causes flickering of global brightness.
-    - No ability to change brightness and contrast on the fly.
-
-    For QC, seems that .tif export is still the best option.
-    '''
-    with h5py.File(h5_path, 'r') as f:
-        key = 'mov' if 'mov' in f.keys() else 'data'
-        data = f[key]
-
-        if start_index < 0 or end_index >= data.shape[0]:
-            raise ValueError("Invalid start or end index.")
-        
-        first_frame = data[start_index]
-        height, width = first_frame.shape
-
-        fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        video_out = cv2.VideoWriter(save_path, fourcc, fps, (width, height), isColor=False)
-
-        # Processing by chunk to keep memory utilization reasonable.
-        try:
-            for chunk_start in range(start_index, end_index+1, chunk_size):
-                chunk_end = min(chunk_start + chunk_size, end_index + 1)
-                chunk = data[chunk_start:chunk_end,:,:]
-
-                for frame in chunk:
-                    frame_norm = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX)
-                    frame_8bit = frame_norm.astype(np.uint8)
-                    video_out.write(frame_8bit)
-        finally:
-            video_out.release()
-"""
 
 def deinterleave_movies(parent_dir, scope_format):
     """

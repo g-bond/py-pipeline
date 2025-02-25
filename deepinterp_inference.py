@@ -42,7 +42,7 @@ if __name__ == '__main__':
     do_denoising = process_choices['column1']
     make_samples = process_choices['column2']
     
-    code.interact(local=dict(globals(), **locals())) 
+    #code.interact(local=dict(globals(), **locals())) 
     for i in range(len(sessions_to_run)):
         if do_denoising[i]:
             # Quick check - deepinterp inference will only work with field "data"

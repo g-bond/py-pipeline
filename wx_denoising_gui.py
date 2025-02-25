@@ -237,11 +237,3 @@ if __name__ == '__main__':
 
     results = run_selection_configuration(paths, data_lengths)
     
-    #code.interact(local=dict(globals(), **locals())) 
-    #if results:
-    #    print("\nResults:")
-    #    print("Paths:", results['paths'])
-    #    print("Column 1 selections:", results['column1'])
-    #    print("Column 2 selections:", results['column2'])
-    #    print("Low numbers:", results['low_numbers'])
-    #    print("High numbers:", results['high_numbers'])

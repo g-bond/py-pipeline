@@ -156,7 +156,8 @@ def register_bulk(sessions_to_run, process_selections):
         n_procs = 0
         t_start = datetime.now()
         if process_selections[0,i]:
-            stacks_to_hdf5(sessions_to_run[i], delete_tiffs=True)
+            h5_name = os.path.join(sessions_to_run[i], 'unregistered.h5')
+            tif_stacks_to_h5(sessions_to_run[i], h5_name)
         if process_selections[1,i]:
             n_procs +=1
             register_one_session(sessions_to_run[i], mc_dict, keep_memmap=False,save_sample=True, sample_name=f"{n_procs:02}_rigid.tif")
@@ -172,6 +173,6 @@ def register_bulk(sessions_to_run, process_selections):
 if __name__ == '__main__':
     # HDF5 to tif, first registration, second_registration, NoRMCorre
     workdirs, proc_opts = get_registration_options()
-    code.interact(local=dict(globals(), **locals())) 
+    #code.interact(local=dict(globals(), **locals())) 
     if workdirs:
         register_bulk(workdirs, proc_opts)
