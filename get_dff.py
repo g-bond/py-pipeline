@@ -139,7 +139,6 @@ for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
 if do_neuropil:
     dff_neuropil = filter_baseline_dF_comp(raw_neuropil, 99*4+1)
 
-code.interact(local=dict(globals(), **locals())) 
 if stim_file > -1:
     print('Grabbing two-photon frametimes')
     if 'BRUKER' in data_type:
@@ -149,7 +148,7 @@ if stim_file > -1:
         if frame_triggers[0] > 340:
             print('First 2p frame was dropped!')
         
-        #frame_triggers = replace_missing_frame_triggers(frame_triggers)
+        frame_triggers = replace_missing_frame_triggers(frame_triggers)
 
         psychopy_loc = data_type + '_PSYCHOPY'
         voltage_files = glob('*VoltageRecording*.csv') # already in datadir
@@ -161,7 +160,7 @@ if stim_file > -1:
         print('scanimage two-photon timeframes must be implemented')
         sys.exit(1)
 
-    print(f'Num frametriggers detected: {frame_triggers.shape[1]}')
+    #print(f'Num frametriggers detected: {frame_triggers.shape[1]}')
     print('Getting stimulus times and syncing with two-photon frame times...')
     stim_triggers = medfilt(vrec[:,2],101)
     stim_triggers[stim_triggers < 0] = 0
@@ -175,19 +174,19 @@ if stim_file > -1:
         stim_triggers = medfilt(vrec[:,2],51)
         stim_triggers[stim_triggers < 0] = 0
         photostim_triggers = find_peaks(stim_triggers, distance=1e4, height=(max(stim_triggers) - max(stim_triggers)*0.9))
-    
+        photostim_triggers = photostim_triggers[0]
     psychopy_file_str = os.path.join(psychopy_loc,'-'.join([date[4:], date[0:2], date[2:4]]))
     os.chdir(save_location+psychopy_file_str)
     
     psychopy_file = np.genfromtxt('T'+'{:03d}'.format(stim_file)+'.txt')
     
-    # Branch logic here can be changed
+    
     if not is_2p_opto:
         stim_id = psychopy_file[:,0]
         unique_stims = np.unique(stim_id)
         stim_properties = psychopy_file[:,1:]
     else:
-        if psychopy_file.shape[0] == 2:
+        if psychopy_file.shape[1] == 2:
             stim_id = psychopy_file[:,0]
             #stim_id[0] = None # First target is often lost because of PrairieView.
         else:
@@ -207,14 +206,14 @@ if stim_file > -1:
         stim_on_2p_frame[s] = np.argmin(abs(stim_on[s] - frame_triggers))
 
     ## Target Stim 2p Frame synchronization
-    #if is_2p_opto:
+    if is_2p_opto:
+        target_stim_2p_frame = np.zeros((len(photostim_triggers)))
+        for ss in range(len(photostim_triggers)):
+            target_stim_2p_frame[ss] = np.argmin(abs(photostim_triggers[ss] - frame_triggers))
+    
 else:
     print('No stimulus triggers recorded for this dataset.')
 
-code.interact(local=dict(globals(), **locals())) 
-# This isn't matching the same regression slopes as MATLAB.
-#   Will need to make sure the algorithm matches the same
-#   weighting choices that MATLAB does.
 #if do_neuropil:
 #    neuropil_subtraction()
 code.interact(local=dict(globals(), **locals())) 
