@@ -181,15 +181,23 @@ if stim_file > -1:
     
     psychopy_file = np.genfromtxt('T'+'{:03d}'.format(stim_file)+'.txt')
     
+    # Branch logic here can be changed
     if not is_2p_opto:
         stim_id = psychopy_file[:,0]
         unique_stims = np.unique(stim_id)
         stim_properties = psychopy_file[:,1:]
     else:
-        print('Need to test this with a 2p opto file')
-        code.interact(local=dict(globals(), **locals())) 
-        sys.exit(1)
-
+        if psychopy_file.shape[0] == 2:
+            stim_id = psychopy_file[:,0]
+            #stim_id[0] = None # First target is often lost because of PrairieView.
+        else:
+            stim_id = psychopy_file[:,2]
+        unique_stims = np.unique(stim_id)
+        if psychopy_file.shape[1] > 3:
+            stim_properties = psychopy_file[:,3:]
+        target_number = psychopy_file[:,0]
+        target_trial  = psychopy_file[:,1]
+    
     assert len(stim_on) == len(stim_id),'Mismatch between stimulus onset times and number of stimulus IDs.'
 
     
