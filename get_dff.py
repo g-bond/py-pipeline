@@ -26,17 +26,17 @@ from img_utils import *
 
 save_location = '/mnt/md0/'
 data_type = 'BRUKER'
-date = '11032024'
-file_num = 15
-stim_file= 15
+date = '11042024'
+file_num = 10
+stim_file= -1
 optical_zoom = 2
 dur_resp  = 2.5 # seconds
 
 # Uncomment as each is verified in behavior
-do_neuropil = True
-do_cascade = False
+do_neuropil   = True
+do_cascade    = True
 cascade_model = ''
-is_2p_opto = True
+is_2p_opto    = False
 # is_voltage = False
 # extract_hotspot = False
 
@@ -56,6 +56,19 @@ assert os.path.isdir(os.path.join(cascade_model_dir, cascade_model)),  \
     'Install, or check if a valid pretrained cascade model was specified.'
 sys.path.append(cascade_dir)
 from cascade2p.cascade import predict as cascade_predict
+
+
+# Storing results so far
+# This may not be the best way of passing around information globally.
+out_h5_name = 'TSeries-'+date+'-'+f'{file_num:03d}.h5'
+outfile = h5py.File(out_h5_name, 'w')
+outfile.create_dataset('frame_period', data=frame_period)
+outfile.create_dataset('stim_file', data=stim_file)
+outfile.create_dataset('dur_resp', data=dur_resp)
+outfile.create_dataset('do_cascade', data=do_cascade)
+
+# Processing starting...
+
 
 folder_list = get_target_folders_v2(save_location+data_type+'/', date,file_num, 'TSeries')
 
@@ -86,6 +99,7 @@ except FileNotFoundError:
 dat_name = [key for key in h.keys()][0]
 num_frames, size_x, size_y = h[dat_name].shape
 
+
 ## Grabbing cell masks -
 x = np.linspace(0, size_x-1, size_x)
 y = np.linspace(0, size_y-1, size_y)
@@ -100,6 +114,8 @@ for cc in tqdm(range(num_cells), desc="getting masks", ncols=75):
     else:
         mask2d[cc,:,:] = in_polygon(x, y, nm_coord[:,0], nm_coord[:,1])
     neuropil_mask += mask2d[cc,:,:]
+outfile.create_dataset('mask2d', data=mask2d)
+outfile.create_dataset('neuropil_mask', data=neuropil_mask)
 
 
 ## Using cell masks to extract raw cell traces -
@@ -131,6 +147,7 @@ if not is_deep_interp:
     del raw_cell_traces_
     num_frames = num_frames - 30
 
+
 ## Getting dF/F from raw traces
 dff = np.zeros((num_frames, num_cells))
 for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
@@ -139,6 +156,14 @@ for cc in tqdm(range(num_cells), desc="Getting dF/F per cell...", ncols=75):
 if do_neuropil:
     dff_neuropil = filter_baseline_dF_comp(raw_neuropil, 99*4+1)
 
+# Save results so far
+outfile.create_dataset('raw_cell_traces', data=raw_cell_traces)
+outfile.create_dataset('dff', data=dff)
+if do_neuropil:
+    outfile.create_dataset('raw_neuropil', data=raw_neuropil)
+    outfile.create_dataset('dff_neuropil', data=dff_neuropil)
+
+# Stimulus information, frame triggers, stimulus triggers, etc.
 if stim_file > -1:
     print('Grabbing two-photon frametimes')
     if 'BRUKER' in data_type:
@@ -155,6 +180,8 @@ if stim_file > -1:
         assert len(voltage_files) == 1, f'Unique, singular voltage file not found. Check {target_folder}'
         vrec = genfromtxt_with_progress(voltage_files[0], delimiter=',', skip_header=1) # skip one row. uses np.genfromtxt
 
+        outfile.create_dataset('frame_triggers', data=frame_triggers)
+        outfile.create_dataset('vrec', data=vrec)
 
     elif 'SCANIMAGE' in data_type:
         print('scanimage two-photon timeframes must be implemented')
@@ -162,25 +189,30 @@ if stim_file > -1:
 
     #print(f'Num frametriggers detected: {frame_triggers.shape[1]}')
     print('Getting stimulus times and syncing with two-photon frame times...')
-    stim_triggers = medfilt(vrec[:,2],101)
+    stim_triggers = medfilt(vrec[:,1],101)
     stim_triggers[stim_triggers < 0] = 0
     stim_triggers = np.diff(stim_triggers)
 
     stim_on, _  = find_peaks(stim_triggers, distance=1e3, height=(max(stim_triggers) - max(stim_triggers)*0.9))
     stim_off, _ = find_peaks(stim_triggers, distance=1e3, height=(max(stim_triggers) - max(stim_triggers)*0.9))
-    
+
+    outfile.create_dataset('stim_on', data=stim_on)
+    outfile.create_dataset('stim_off', data=stim_off)
+
     if is_2p_opto:
         print('Processing 2pOpto triggers...')
-        stim_triggers = medfilt(vrec[:,2],51)
+        stim_triggers = medfilt(vrec[:,1],51)
         stim_triggers[stim_triggers < 0] = 0
         photostim_triggers = find_peaks(stim_triggers, distance=1e4, height=(max(stim_triggers) - max(stim_triggers)*0.9))
         photostim_triggers = photostim_triggers[0]
+        outfile.create_dataset('photostim_triggers', photostim_triggers)
+
     psychopy_file_str = os.path.join(psychopy_loc,'-'.join([date[4:], date[0:2], date[2:4]]))
     os.chdir(save_location+psychopy_file_str)
-    
+
     psychopy_file = np.genfromtxt('T'+'{:03d}'.format(stim_file)+'.txt')
-    
-    
+
+
     if not is_2p_opto:
         stim_id = psychopy_file[:,0]
         unique_stims = np.unique(stim_id)
@@ -194,137 +226,120 @@ if stim_file > -1:
         unique_stims = np.unique(stim_id)
         if psychopy_file.shape[1] > 3:
             stim_properties = psychopy_file[:,3:]
+            outfile.create_dataset('stim_properties', data=stim_properties)
         target_number = psychopy_file[:,0]
         target_trial  = psychopy_file[:,1]
-    
+
+        outfile.create_dataset('target_number',data=target_number)
+        outfile.create_dataset('target_trial',data=target_trial)
+
+
+    outfile.create_dataset('stim_id',data=stim_id)
+    outfile.create_dataset('unique_stims', data=unique_stims)
+
     assert len(stim_on) == len(stim_id),'Mismatch between stimulus onset times and number of stimulus IDs.'
 
-    
+
     stim_on_2p_frame = np.zeros(len(stim_id))
 
     for s in range(len(stim_id)):
         stim_on_2p_frame[s] = np.argmin(abs(stim_on[s] - frame_triggers))
+    outfile.create_dataset('stim_on_2p_frame', data=stim_on_2p_frame)
 
     ## Target Stim 2p Frame synchronization
     if is_2p_opto:
         target_stim_2p_frame = np.zeros((len(photostim_triggers)))
         for ss in range(len(photostim_triggers)):
             target_stim_2p_frame[ss] = np.argmin(abs(photostim_triggers[ss] - frame_triggers))
-    
+        outfile.create_dataset('target_stim_2p_frame', data=target_stim_2p_frame)
+
 else:
     print('No stimulus triggers recorded for this dataset.')
 
-#if do_neuropil:
-#    neuropil_subtraction()
+if do_neuropil:
+    neuropil_subtraction(outfile=outfile, roi_list=roi_list)
+
+if do_cascade:
+#    cascade_results = cascade_predict('Universal_30Hz_smoothing100ms', dff.T, model_folder=cascade_model_dir)
+    spike_inference = cascade_predict('Global_EXC_30Hz_smoothing50ms_causalkernel', dff.T, model_folder=cascade_model_dir).T
+    outfile.create_dataset('spike_inference', data=spike_inference)
+
+gen_stim_cyc(outfile=outfile)
+
+#dendrite_subtraction(outfile=outfile, frame_period=frame_period)
+
+
 code.interact(local=dict(globals(), **locals())) 
-robust_reg = HuberRegressor()
-for iter in range(len(roi_list)):
-    if roi_list[iter].roitype == 7:
-        robust_reg.fit(den.reshape(-1,1), sp)
-        quick_slope = robust_reg.coef_[0]
-        r = dff[:,iter] - (slope * dff_neuropil)
-
-
-#if do_cascade:
-    #cascade_results = cascade_predict('Universal_30Hz_smoothing100ms', dff.T, model_folder=cascade_model_dir)
-#    spike_inference = cascade_predict('Global_EXC_30Hz_smoothing50ms_causalkernel', dff.T, model_folder=cascade_model_dir).T
-
-
-
-###  gen_stim_cyc([dur_resp, 0, 0], ) ---------------
-# SO much global information is used for calculating stimulus cycles...
-# Do it here first, then figure out how you're going to pass that info
-#   via reading off the .h5 (may have concurrent read access problems)
-if stim_file > 0:
-    pre = 0
-    slag = 0
-
-    n_trials = int(np.floor(len(stim_id) / len(unique_stims)))
-    stim_dur = int(np.round(dur_resp / frame_period))
-    cyc_pre  = int(np.round(pre     / frame_period))
-    cyc_slag = int(np.round(slag   / frame_period))
-
-    cyc         = np.zeros((num_cells, len(unique_stims), n_trials, stim_dur + pre))
-    cyc_spk_inf = np.zeros((num_cells, len(unique_stims), n_trials, stim_dur + pre))
-
-    for cc in range(num_cells):
-        trial_list = np.zeros(len(unique_stims))
-
-        for ii in range(len(stim_on_2p_frame)):
-            # The original MATLAB for this one is confusing to me
-            #   if sum(trialList==ntrials)~=uniqStims
-            if True:
-                tt = np.arange(stim_on_2p_frame[ii]- cyc_pre + 1 + cyc_slag, stim_on_2p_frame[ii] + stim_dur + cyc_slag + 1)
-                tt = tt.astype('int')
-                ind = np.argwhere(unique_stims == stim_id[ii])[0][0] # <- horrendous notation
-                trial_list[ind] += 1
-
-                if tt[-1] < dff.shape[0]: # Don't want to continue beyond the end of our timeseries
-                    f = dff[tt,cc]
-                    # Isn't the same check as finding if the ce struct has this field.
-                    if do_cascade:
-                        s = spike_inference[tt,cc]
-                else:
-                    f = np.empty((76,))
-                    s = np.empty((76,))
-                    f[:] = np.nan
-                    s[:] = np.nan
-
-                cyc[cc, ind, int(trial_list[ind]), :] = f
-                if do_cascade:
-                    cyc_spk_inf[cc, ind, int(trial_list[ind]), :] = s
-
-### End genstimcyc -------------------------
-
 
 ### Dendrite Subtraction -------------------
+## Neuropil subtraction will change DFF, but there's no reason to
+#       ever have both neuropil and dendrite subtraction
+#       since one is population and the other is sparse.
+
 dend_sub_flag = 1
 
 is_dendrite = [roi.roitype == 5 for roi in roi_list]
 is_dendrite = np.where(is_dendrite)[0]
 
-dend_count = 0
+# Dendrite ROI before or after spine ROIs?
+if 0 in is_dendrite:
+    dend_count = 1
+else:
+    dend_count = 0
+
+robust_reg = HuberRegressor()
+#robust_reg.fit(dff[:,iter].reshape(-1,1), dff_neuropil)
+#quick_slope = robust_reg.coef_[0]
+
+dend_sub_slopes = np.zeros((num_cells,))
+dff_res = np.zeros((dff.shape))
+if cyc:
+    cyc_res = np.zeros((cyc.shape))
 
 for cc in range(num_cells):
-    
     if roi_list[cc].roitype == 5:
         dend_count += 1
-    
     elif roi_list[cc].roitype == 7:
         sp_dff = dff[:,cc]
         sp_dff = sp_dff[0:int(np.round(len(sp_dff)*0.9))] # Kick out the last 10%
         sp_dff[np.isinf(sp_dff)] = 0
         sp_dff_sub = sp_dff[sp_dff < np.nanmedian(sp_dff) + np.abs(np.min(sp_dff))]
-        
         noise_m  = np.nanmedian(sp_dff_sub)
         noise_sd = np.nanstd(sp_dff_sub)
-
         if dend_sub_flag == 1:
-            disp('find robustfit py equiv')
-            # slope = robustfit( dff[:,is_dendrite[dend_count]], dff[:,cc])
-        elif dend_sub_flag == 1 and cyc:
+            robust_reg.fit( dff[:,is_dendrite[dend_count]].reshape(-1,1), dff[:,cc])
+            slope = robust_reg.coef_[0]
+        # cyc existence check isn't trivial
+        # sp_cyc flattening into a single-dimension needs to be checked.
+        elif dend_sub_flag == 1 and cyc is not None:
             sp_cyc = cyc[cc,:,:,:]
             sp_cyc[np.isnan[sp_cyc]] = 0
-            # check indexing of cyc material here
-            # slope = robustfit (cyc[is_dendrite[dend_count],:,:,:], sp_cyc))
+            robust_reg.fit(cyc[is_dendrite[dend_count],:,:,:], sp_cyc)
+            slope = robust_reg.coef_[0]
+            
         else:
-            print('Not implemented')
-            # slope = robustfit (dff[:,is_dendrite[dend_count]])
-        #r = dff[cc,:] - slope 
+            robust_reg.fit(dff[:,is_dendrite[dend_count]].reshape(-1,1), dff[:,cc])
+            slope = robust_reg.coef_[0]
+        dend_sub_slopes[cc] = slope        
+        # Check for this should be at start so we can preallocate before loop.
+        #if cyc:
+        #    cyc_res[cc,:,:,:] = cyc[cc,:,:,:] - (slope * cyc[is_dendrite[dend_count],:,:,:])
+        #    cyc_res[cc,:,:,:]
+        r = dff[:,cc] - (slope * dff[:,is_dendrite[dend_count]])
+        dff_res[:,cc] = r
         r_sp = dff[:,cc]
         r_dn = dff[:,is_dendrite[dend_count]]
-        r_sp = r_sp - np.multiply(slope[2], noise_sd)
+        r_sp = r_sp - (slope * r_dn)
         r_sp[r_sp < (-1*noise_sd)] = (-1 * noise_sd)
         r_sp[np.isinf(r_sp)] = 0
         r_dn[np.isinf(r_dn)] = 0
-        
-        # dffRes structure
+        dff_res[:,cc] = r_sp
         r_sp[r_sp <= 0] = np.nan
         r_dn[r_dn <= 0] = np.nan
-
+        #code.interact(local=dict(globals(), **locals())) 
         # r = corrcoef(r_sp, r_dn, 'rows', 'pairwise')
     else:
-        #cycRes
+        #cyc_res[cc,:,:,:] = 0
         #slope
         #corr
         print('Not implemented.')

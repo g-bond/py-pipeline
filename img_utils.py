@@ -21,6 +21,8 @@ from skimage.draw import polygon2mask
 
 from tqdm import tqdm
 
+from sklearn.linear_model import HuberRegressor
+
 def gen_polyline_roi(nm_coord, d_width=10.0, size_x=512, size_y=512):
     '''
     Create a mask for dendrite ROI
@@ -217,49 +219,93 @@ def genfromtxt_with_progress(filename, **kwargs):
         return np.genfromtxt(tqdm(f, total=total_lines, ncols=75), **kwargs)
         #return np.genfromtxt(tqdm(f, total=total_lines), **kwargs)
  
-def neuropil_subtraction(dff_mat, dff_neuro, is_soma):
+def neuropil_subtraction(outfile, roi_list):
     '''
     Remove out the neuropil signal from somas.
     Uses statsmodels 'RLM'.
 
     Parameters:
-        dff_mat (np.array): 2d array of (time, cell) for the dff trace per mask
-        dff_neuro (np.array): 1d array of dff trace for the neuropil signal
-        is_soma (list of Bool): Identity of whether cells are somas or not.
+        outfile (h5py._hl.files.File) File handle for .h5 beign used to store results.
+        roi_list (list of ImagejRoi) List of ImageJ ROIs
     Returns:
-        dff_depilled (np.array): 2d array of (time, cell).
-            Contains dff_mat, but fit to the slope found 
-        dff_slopes (np.array): 1d array of each slope found through the robustfit process.
+        Nothing, just writes the neuropil-subtracted traces to the output .h5
     '''
-    # statsmodels.sm RLM (Robust Linear Model) attempt
-    # scikit-learn attempt - RANSAC Regressor
-    #
-    # From MATLAB robustfit...
-    #   The algorithm uses iteratively reweighted least squares with the bisquare weighting function. 
-    #   By default, ROBUSTFIT adds a column of ones to X, corresponding to a
-    #   constant term in the first element of B.  Do not enter a column of ones
-    #   directly into the X matrix.
+    neuro_sub_slopes = np.zeros((len(roi_list)))
+    dff_neuro_subtracted = np.zeros((outfile['dff'].shape))
 
-def dendrite_subtraction():
+    robust_reg = HuberRegressor()
+    for iter in range(len(roi_list)):
+        if roi_list[iter].roitype == 7:
+            #robust_reg.fit(den.reshape(-1,1), sp)
+            robust_reg.fit(outfile['dff'][:,iter].reshape(-1,1), outfile['dff_neuropil'])
+            quick_slope = robust_reg.coef_[0]
+            neuro_sub_slopes[iter] = quick_slope
+            r = outfile['dff'][:,iter] - (quick_slope * outfile['dff_neuropil'])
+            dff_neuro_subtracted[:,iter] = r
+        else:
+            neuro_sub_slopes[iter] = None
+    outfile.create_dataset('neuro_subtraction_slopes', data=neuro_sub_slopes)
+    outfile.create_dataset('dff_neuro_subtracted', data=dff_neuro_subtracted)
+
+def gen_stim_cyc(outfile):
     '''
     Remove dendrite signal from spine ROIs.
     Navigate it here once you have a way to get it out of main script.
     Parameters:
-        -
+        outfile (h5py._hl.files.File) File handle for .h5 beign used to store results.
     Returns:
-        -
+        Nothing, just writes the neuropil-subtracted traces to the output .h5
     '''
-    
+    # Extract values out of outfile
+    pre = outfile['pre']
+    slag = outfile['slag']
+    dur_resp = outfile['dur_resp']
+    frame_period = outfile['frame_period']
+    num_cells = outfile['dff'].shape[1]
+    unique_stims = outfile['unique_stims']
+    stim_on_2p_frame = outfile['stim_on_2p_frame']
+    stim_id = outfile['stim_id']
+    dff = outfile['dff']
 
-def gen_stim_cyc():
-    '''
-    Gather waveforms for each stimulus condition, for each ROI.
-    Navigate it here once you have a way to get it out of main script.
-    Parameters:
-        - 
-    Returns:
-        -
-    '''
+    n_trials = int(np.floor(len(outfile['stim_id']) / len(outfile['unique_stims'])))
+    stim_dur = int(np.round(dur_resp / frame_period))
+    cyc_pre  = int(np.round(pre     / frame_period))
+    cyc_slag = int(np.round(slag   / frame_period))
+
+    cyc         = np.zeros((num_cells, len(unique_stims), n_trials, stim_dur + pre))
+    cyc_spk_inf = np.zeros((num_cells, len(unique_stims), n_trials, stim_dur + pre))
+
+    for cc in range(num_cells):
+        print(f'cell-iter {cc}')
+        trial_list = np.zeros(len(unique_stims))
+        for ii in range(len(stim_on_2p_frame)):
+            print(f'stim-iter {ii}')
+            # The original MATLAB for this one is confusing to me
+            if sum(trial_list==n_trials) != len(unique_stims):
+                tt = np.arange(stim_on_2p_frame[ii]- cyc_pre + 1 + cyc_slag, stim_on_2p_frame[ii] + stim_dur + cyc_slag + 1)
+                tt = tt.astype('int')
+                ind = np.argwhere(unique_stims == stim_id[ii])[0][0] # <- horrendous notation
+                if tt[-1] < dff.shape[0]: # Don't want to continue beyond the end of our timeseries
+                    f = dff[tt,cc]
+                    # Isn't the same check as finding if the ce struct has this field.
+                    if outfile['do_cascade']:
+                        s = outfile['spike_inference'][tt,cc]
+                else:
+                    f = np.empty((76,))
+                    s = np.empty((76,))
+                    f[:] = np.nan
+                    s[:] = np.nan
+                cyc[cc, ind, int(trial_list[ind]), :] = f
+                if outfile['do_cascade']:
+                    cyc_spk_inf[cc, ind, int(trial_list[ind]), :] = s
+                trial_list[ind] += 1
+    # Package information for further analysis
+    outfile.create_dataset('cyc',data=cyc)
+    if cyc_spk_inf in locals():
+        outfile.create_dataset('cyc',data=cyc_spk_inf)
+
+#def gen_stim_cyc(outfile):
+
 
 def read_xml_file(fname):
     '''
